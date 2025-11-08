@@ -453,3 +453,38 @@ class Trainer:
 
         return self.history, self.model
     
+    @torch.no_grad()
+    def evaluate(self):
+        if self.test_loader is None:
+            raise ValueError("Test dataset not provided.")
+
+        self.model.eval()
+        test_loss_sum = 0.0
+        test_metric_sum = 0.0
+        test_count = 0
+
+        with torch.no_grad():
+            for X_test, _ in self.test_loader:
+                X_test = X_test.to(self.device, non_blocking=self.pin_memory)
+                outputs_test = self.model(X_test)
+                loss_dict_test = self.criterion(*outputs_test)
+                loss_test = loss_dict_test['Loss']
+                bsz = X_test.size(0)
+                test_loss_sum += float(loss_test.item()) * bsz
+
+                if self.metric:
+                    test_metric_sum += float(self.metric(outputs_test[0], X_test)) * bsz
+
+                test_count += bsz
+
+        test_loss = test_loss_sum / max(test_count, 1)
+        test_metric = (test_metric_sum / max(test_count, 1)) if self.metric else 0.0
+
+        print(f"Test Loss: {test_loss:.4f}")
+        if self.metric:
+            print(f"Test Metric: {test_metric:.4f}")
+
+        return {
+            'test_loss': test_loss,
+            'test_metric': test_metric
+        }
