@@ -1,6 +1,6 @@
 import torch
-from model import BaseVAE
-from config import VAE_Config
+from src.model import BaseVAE
+from src.config import VAE_Config
 from torch import nn, Tensor
 from torch.nn import functional as F
 from typing import *

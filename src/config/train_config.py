@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 @dataclass
 class TrainConfig:
     batch_size: int = 8
-    criterion: dict = field(default_factory=lambda: {'name': 'cross_entropy_loss', 'kwargs': {}})
+    criterion: dict = field(default_factory=lambda: {'name': 'vae_loss', 'kwargs': {'kld_weight': 1.0}})
     optimizer: dict = field(default_factory=lambda: {'name': 'adam', 'kwargs': {'lr': 1e-3, 'eps': 1e-4}})
     scheduler: dict = field(default_factory=lambda: {'name': 'exponential_lr', 'kwargs': {'gamma': 0.96}})
     callbacks: list = field(default_factory=lambda: [{'name': 'early_stopping', 'kwargs': {'patience': 5}}])

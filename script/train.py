@@ -22,7 +22,7 @@ def parse_args():
         help="Path to the training configuration YAML file"
     )
     parser.add_argument(
-        'checkpoint_path',
+        '--checkpoint_path',
         type=str,
         default=None,
         help="Path to restore training"
@@ -30,19 +30,19 @@ def parse_args():
 
     # Data args
     parser.add_argument(
-        'train_data_dir',
+        '--train_data_dir',
         type=str,
         default='./data/train/galaxies_ml_train.hdf5',
         help="Path to the training data HDF5 file"
     )
     parser.add_argument(
-        'val_data_dir',
+        '--val_data_dir',
         type=str,
         default='./data/val/galaxies_ml_val.hdf5',
         help="Path to the validation data HDF5 file"
     )
     parser.add_argument(
-        'test_data_dir',
+        '--test_data_dir',
         type=str,
         default='./data/test/galaxies_ml_test.hdf5',
         help="Path to the test data HDF5 file"
