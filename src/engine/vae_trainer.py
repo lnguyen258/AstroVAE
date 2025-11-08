@@ -275,14 +275,14 @@ class Trainer:
 
     def train(self) -> Tuple[Dict[str, List[float]], nn.Module]:
         try:
-            # Callback before training
+            # Callback before training  
             for cb in self.callbacks:
                 cb.on_train_begin(trainer=self)
 
             total_steps = self.num_epochs * len(self.train_loader)
             start_step = self.start_epoch * len(self.train_loader)
 
-            if self.progress_bar and self.rank == 0:
+            if self.progress_bar:
                 console = Console()
                 progress = Progress(
                     TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
@@ -309,7 +309,6 @@ class Trainer:
                     avg_loss=0.0, 
                     avg_metric=0.0
                 )
-
             else:
                 class _NoOpBar:
                     def advance(self, *args, **kwargs): pass
@@ -320,44 +319,39 @@ class Trainer:
                     def __exit__(self, *args): pass
                 progress = _NoOpBar()
                 task = None
-
+            
             for epoch in range(self.start_epoch, self.num_epochs):
-                # Callback at the beginning of each epoch
                 for cb in self.callbacks:
-                    cb.on_epoch_begin(epoch, trainer=self)
+                    cb.on_epoch_begin(trainer=self, epoch=epoch)
 
-                # Training phase
                 self.model.train()
                 running_loss_sum = 0.0
                 running_metric_sum = 0.0
                 running_count = 0
-                
 
-                for batch_idx, (X, y) in enumerate(self.train_loader):
+                for batch_idx, (X,_) in enumerate(self.train_loader):
                     step = epoch * len(self.train_loader) + batch_idx + 1
-
                     X = X.to(self.device, non_blocking=self.pin_memory)
-                    y = y.to(self.device, non_blocking=self.pin_memory)
-
                     self.optimizer.zero_grad()
                     outputs = self.model(X)
-                    loss = self.criterion(outputs, y)
+                    loss_dict = self.criterion(*outputs)
+                    loss = loss_dict['Loss']
                     loss.backward()
                     self.optimizer.step()
-                    bsz = y.size(0)
+                    bsz = X.size(0)
                     running_loss_sum += float(loss.item()) * bsz
 
                     if self.metric:
-                        running_metric_sum += float(self.metric(outputs, y)) * bsz
+                        running_metric_sum += float(self.metric(outputs[0], X)) * bsz
 
                     running_count += bsz
 
                     avg_loss = running_loss_sum / max(running_count, 1)
                     avg_metric = running_metric_sum / max(running_count, 1)
-                    
+
                     # Short summary
-                    
-                    if self.rank == 0 and task is not None:
+
+                    if task is not None:
                         progress.update(
                         task,
                         advance=1,
@@ -374,34 +368,32 @@ class Trainer:
                                 f"train_metric: {avg_metric:.4f}"
                             )
                             console.log(message)
-
-                            
+                    
                 # Validation phase
                 self.model.eval()
-                val_loss_sum = 0.0
+                val_loss_sum = 0.0 
                 val_metric_sum = 0.0
                 val_count = 0
 
                 with torch.no_grad():
-                    for X_val, y_val in self.val_loader:
+                    for X_val, _ in self.val_loader:
                         X_val = X_val.to(self.device, non_blocking=self.pin_memory)
-                        y_val = y_val.to(self.device, non_blocking=self.pin_memory)
-
                         outputs_val = self.model(X_val)
-                        loss_val = self.criterion(outputs_val, y_val)
-                        bsz = y_val.size(0)
+                        loss_dict_val = self.criterion(*outputs_val)
+                        loss_val = loss_dict_val['Loss']
+                        bsz = X_val.size(0)
                         val_loss_sum += float(loss_val.item()) * bsz
 
                         if self.metric:
-                            val_metric_sum += float(self.metric(outputs_val, y_val)) * bsz
+                            val_metric_sum += float(self.metric(outputs_val[0], X_val)) * bsz
 
                         val_count += bsz
-
+                
                 total_loss_sum = val_loss_sum
                 total_metric_sum = val_metric_sum
                 total_count = val_count
 
-                # Global averages
+                # Global average
                 val_loss = total_loss_sum / max(total_count, 1)
                 val_metric = (total_metric_sum / max(total_count, 1)) if self.metric else 0.0
 
@@ -414,7 +406,7 @@ class Trainer:
 
                 if self.scheduler:
                     self.scheduler.step()
-
+                
                 # Get learning rate
                 current_lr = self.optimizer.param_groups[0]['lr']
 
@@ -422,7 +414,7 @@ class Trainer:
                 if self.best_model_path and val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
                     torch.save(self.model.state_dict(), self.best_model_path)
-
+                
                 # Update history
                 self.history['epoch'].append(epoch + 1)
                 self.history['train_loss'].append(avg_loss)
@@ -457,79 +449,7 @@ class Trainer:
                 cb.on_train_end(trainer=self)
 
         except KeyboardInterrupt:
-            if self.rank == 0:
-                print(f"\nTraining interrupted at epoch {epoch + 1}. Saving current checkpoint.")
-                self.save_checkpoint(epoch)
+            print(f"\nTraining interrupted at epoch {epoch + 1}.")
 
         return self.history, self.model
     
-    @torch.no_grad()
-    def evaluate(
-        self,
-        loss_type: str,
-        plot: Optional[Union[Callable, List[Callable]]] = None
-    ) -> Tuple[float, float, np.ndarray, np.ndarray]:
-        if self.test_loader is None:
-            raise ValueError("Test dataset is not provided.")
-        
-        self.model.eval()
-        loss_sum = 0.0
-        metric_sum = 0.0
-        count = 0
-        local_true = []
-        local_pred = []
-
-        for X_test, y_test in self.test_loader:
-            X_test = X_test.to(self.device, non_blocking=self.pin_memory)
-            y_test = y_test.to(self.device, non_blocking=self.pin_memory)
-
-            outputs = self.model(X_test)
-            batch_loss = self.criterion(outputs, y_test)
-            bsz = y_test.size(0)
-            loss_sum += float(batch_loss.item()) * bsz
-
-            if self.metric:
-                metric_sum += float(self.metric(outputs, y_test)) * bsz
-
-            count += bsz
-
-            probs = outputs
-            if loss_type == 'cross_entropy':
-                probs = F.softmax(outputs, dim=1)
-            elif loss_type == 'bce':
-                probs = torch.sigmoid(outputs)
-
-            local_true.append(y_test.detach().cpu().numpy())
-            local_pred.append(probs.detach().cpu().numpy())
-
-        # Stack per-rank arrays
-        local_true = np.concatenate(local_true, axis=0) if local_true else np.empty((0,))
-        local_pred = np.concatenate(local_pred, axis=0) if local_pred else np.empty((0,))
-
-        total_loss_sum = loss_sum
-        total_metric_sum = metric_sum
-        total_count = count
-
-        # Global averages
-        test_loss = total_loss_sum / max(total_count, 1)
-        test_metric = (total_metric_sum / max(total_count, 1)) if self.metric else 0.0
-
-        # Gather all predictions and true labels
-        y_true = local_true
-        y_pred = local_pred
-
-        print(f"test_loss: {test_loss:.4f} | test_metric: {test_metric:.4f}")
-
-        # Visualization
-        if plot is not None:
-            if isinstance(plot, list):
-                for i, viz in enumerate(plot):
-                    output_path = os.path.join(self.outputs_dir, f"{self.run_name}_viz_{i + 1}.png")
-                    output_path = output_path if self.save_fig else None
-                    viz(y_true, y_pred, save_fig=output_path)
-            else:
-                output_path = os.path.join(self.outputs_dir, f"{self.run_name}.png")
-                output_path = output_path if self.save_fig else None
-                plot(y_true, y_pred, save_fig=output_path)
-
-        return test_loss, test_metric, y_true, y_pred

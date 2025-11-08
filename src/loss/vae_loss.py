@@ -8,7 +8,7 @@ def vae_loss(*args, **kwargs) -> Dict:
         mu = args[2]
         log_var = args[3]
 
-        kld_weight = kwargs['M_N'] 
+        kld_weight = kwargs['kld_weight'] 
         recons_loss =F.mse_loss(recons, input)
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
