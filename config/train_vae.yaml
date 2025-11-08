@@ -17,8 +17,8 @@ train:
         # All string-supported optimizer can be found in 'src/loss/optim_registry.py' 
         name: 'adam' 
         kwargs:
-            lr: 0.0002
-            eps: 0.001
+            lr: 0.00002
+            eps: 0.0001
             weight_decay: 0.0
     scheduler:
         # All string-supported schedulers can be found in 'src/optim/scheduler_registry.py'

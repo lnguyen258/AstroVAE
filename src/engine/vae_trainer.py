@@ -230,12 +230,11 @@ class Trainer:
         self.logging_path = os.path.join(self.loggings_dir, f"{self.run_name}.csv")
 
     def save_checkpoint(self, epoch: int):
-        model_state = self.model.module.state_dict() if self._is_distributed else self.model.state_dict()
-        if self.checkpoint_path and self.rank == 0:
+        if self.checkpoint_path:
             checkpoint = {
                 'run_name': self.run_name,
                 'epoch': epoch,
-                'model_state_dict': model_state,
+                'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
                 'history': self.history
@@ -245,8 +244,7 @@ class Trainer:
     def load_checkpoint(self, checkpoint_path: str):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self._set_logging_paths(checkpoint['run_name'])
-        target = self.model.module if self._is_distributed else self.model
-        target.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if self.scheduler is not None and checkpoint['scheduler_state_dict'] is not None:
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
@@ -257,13 +255,9 @@ class Trainer:
     def load_best_model(self, best_model_path: str):
         run_name = os.path.splitext(os.path.basename(best_model_path))[0]
         self._set_logging_paths(run_name)
-        target = self.model.module if self._is_distributed else self.model
-        target.load_state_dict(torch.load(best_model_path, map_location=self.device))
+        self.model.load_state_dict(torch.load(best_model_path, map_location=self.device))
 
     def log_csv(self, log_dict: Dict[str, float]):
-        if self.rank != 0:
-            return
-        
         write_header = not self._log_header_written
         with open(self.logging_path, 'a', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=log_dict.keys())
