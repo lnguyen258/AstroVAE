@@ -2,7 +2,7 @@
 
 A lightweight variational autoencoder (VAE) project to learn the underlying distribution of astronomical images from the GalaxiesML dataset and generate realistic synthetic galaxy images for research purposes. For mathematical details, please see [Original VAE Paper](https://arxiv.org/abs/1906.02691)
 
-![A simple demonstration of Variational AutoEncoder](asset/image_2.jpeg)
+![A simple demonstration of Variational AutoEncoder](asset/image_2.png)
 
 ## Overview
 This repository trains a VAE to model galaxy images so researchers can:
