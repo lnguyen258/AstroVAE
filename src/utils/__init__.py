@@ -6,3 +6,4 @@ from .get_config import (
     get_optim_from_config, 
     get_scheduler_from_config
 )
+from .plot_hist import plot_history
