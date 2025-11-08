@@ -1,1 +1,1 @@
-from .vanilla_trainer import Trainer
+from .vae_trainer import Trainer

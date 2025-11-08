@@ -1,0 +1,45 @@
+model: 
+    in_channels: 5
+    out_channels: 5
+    image_size: 64
+    latent_dim: 128
+    hidden_dims: [32, 64, 128, 256, 512]
+
+train:
+    batch_size: 32
+    criterion: 
+        # All string-supported loss can be found in 'src/loss/loss_registry.py'
+        name: 'vae_loss'
+        kwargs:
+            kld_weight: 1.0
+    
+    optimizer:
+        # All string-supported optimizer can be found in 'src/loss/optim_registry.py' 
+        name: 'adam' 
+        kwargs:
+            lr: 0.0002
+            eps: 0.001
+            weight_decay: 0.0
+    scheduler:
+        # All string-supported schedulers can be found in 'src/optim/scheduler_registry.py'
+        name: 'exponential_lr'
+        kwargs:
+            gamma: 0.97
+    callbacks: 
+        # All string-supported callbacks can be found in 'src/utils/callbacks.py'
+        - name: 'early_stopping'
+          kwargs:
+              monitor: 'val_loss'  # 'val_loss' or 'val_acc'
+              mode: 'min'  # 'min' or 'max'
+              patience: 5
+              min_delta: 0.01
+    num_epochs: 50
+    start_epoch: 0
+    logging_dir: 'log'
+    logging_steps: 300
+    progress_bar: True
+    save_best: True
+    save_ckpt: True
+    save_fig: True
+    num_workers: 8
+    pin_memory: True
